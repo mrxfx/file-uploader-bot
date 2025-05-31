@@ -2,7 +2,6 @@ import express from "express"
 import axios from "axios"
 import { Telegraf } from "telegraf"
 import { randomBytes } from "crypto"
-import mime from "mime-types"
 
 const bot = new Telegraf(process.env.BOT_TOKEN)
 const app = express()
@@ -42,16 +41,17 @@ bot.on(["document", "video", "animation", "photo"], async (ctx) => {
   const id = randomBytes(8).toString("hex")
   storage[id] = { buffer, name: file_name }
   const base = "https://image-uploader-bot.vercel.app"
-  const fileUrl = `${base}/upload?id=${id}`
+  const viewUrl = `${base}/view?id=${id}`
+  const downloadUrl = `${base}/download?id=${id}`
 
-  await ctx.reply(fileUrl, {
+  await ctx.reply(viewUrl, {
     reply_to_message_id: ctx.message.message_id,
     reply_markup: {
       inline_keyboard: [[
-        { text: "👀 View", url: fileUrl },
-        { text: "👭 Share", switch_inline_query: fileUrl }
+        { text: "👀 View", url: viewUrl },
+        { text: "👭 Share", switch_inline_query: viewUrl }
       ], [
-        { text: "🧑‍💻 Developer", url: "https://telegram.dog/Flex_Coder" }
+        { text: "Developer", url: "https://telegram.dog/Flex_Coder" }
       ]]
     }
   })
@@ -59,13 +59,17 @@ bot.on(["document", "video", "animation", "photo"], async (ctx) => {
 
 app.use(bot.webhookCallback("/"))
 
-app.get("/upload", (req, res) => {
+app.get("/view", (req, res) => {
   const file = storage[req.query.id]
   if (!file) return res.status(404).send("File not found")
-
-  const type = mime.lookup(file.name) || "application/octet-stream"
-  res.setHeader("Content-Type", type)
   res.setHeader("Content-Disposition", `inline; filename="${file.name}"`)
+  res.send(file.buffer)
+})
+
+app.get("/download", (req, res) => {
+  const file = storage[req.query.id]
+  if (!file) return res.status(404).send("File not found")
+  res.setHeader("Content-Disposition", `attachment; filename="${file.name}"`)
   res.send(file.buffer)
 })
 
