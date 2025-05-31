@@ -40,8 +40,20 @@ bot.on(["document", "video", "animation", "photo"], async (ctx) => {
   const buffer = (await axios.get(url, { responseType: 'arraybuffer' })).data
   const id = randomBytes(8).toString("hex")
   storage[id] = { buffer, name: file_name }
-  const link = `https://image-uploader-bot.vercel.app/upload?id=${id}`
-  await ctx.reply(link, { reply_to_message_id: ctx.message.message_id })
+  const base = "https://image-uploader-bot.vercel.app"
+  const fileUrl = `${base}/upload?id=${id}`
+
+  await ctx.reply(fileUrl, {
+    reply_to_message_id: ctx.message.message_id,
+    reply_markup: {
+      inline_keyboard: [[
+        { text: "👀 View", url: fileUrl },
+        { text: "👭 Share", switch_inline_query: fileUrl }
+      ], [
+        { text: "🧑‍💻 Developer", url: "https://telegram.dog/Flex_Coder" }
+      ]]
+    }
+  })
 })
 
 app.use(bot.webhookCallback("/"))
@@ -49,7 +61,7 @@ app.use(bot.webhookCallback("/"))
 app.get("/upload", (req, res) => {
   const file = storage[req.query.id]
   if (!file) return res.status(404).send("File not found")
-  res.setHeader("Content-Disposition", `attachment; filename="${file.name}"`)
+  res.setHeader("Content-Disposition", `inline; filename="${file.name}"`)
   res.send(file.buffer)
 })
 
