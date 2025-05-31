@@ -40,7 +40,7 @@ bot.on(["document", "video", "animation", "photo"], async (ctx) => {
   const buffer = (await axios.get(url, { responseType: 'arraybuffer' })).data
   const id = randomBytes(8).toString("hex")
   storage[id] = { buffer, name: file_name }
-  const link = `https://${process.env.VERCEL_URL}/upload?id=${id}`
+  const link = `https://image-uploader-bot.vercel.app/upload?id=${id}`
   await ctx.reply(link, { reply_to_message_id: ctx.message.message_id })
 })
 
