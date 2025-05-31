@@ -1,12 +1,10 @@
 import express from "express"
-import multer from "multer"
 import axios from "axios"
 import { Telegraf } from "telegraf"
 import { randomBytes } from "crypto"
 
 const bot = new Telegraf(process.env.BOT_TOKEN)
 const app = express()
-const upload = multer({ limits: { fileSize: 30 * 1024 * 1024 } })
 const storage = {}
 
 bot.start(async (ctx) => {
@@ -20,7 +18,6 @@ bot.start(async (ctx) => {
 })
 
 bot.on(["document", "video", "animation", "photo"], async (ctx) => {
-  await ctx.telegram.sendChatAction(ctx.chat.id, "upload_document")
   let file_id, file_name
 
   if (ctx.message.document) {
