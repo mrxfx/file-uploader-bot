@@ -1,8 +1,8 @@
-const express = require("express")
-const multer = require("multer")
-const axios = require("axios")
-const { Telegraf } = require("telegraf")
-const { randomBytes } = require("crypto")
+import express from "express"
+import multer from "multer"
+import axios from "axios"
+import { Telegraf } from "telegraf"
+import { randomBytes } from "crypto"
 
 const bot = new Telegraf(process.env.BOT_TOKEN)
 const app = express()
@@ -30,7 +30,7 @@ async function handleFile(ctx, file_id, file_name) {
   const buffer = (await axios.get(url, { responseType: 'arraybuffer' })).data
   const id = randomBytes(8).toString("hex")
   storage[id] = { buffer, name: file_name }
-  const link = `${process.env.VERCEL_URL}/upload?id=${id}`
+  const link = `https://${process.env.VERCEL_URL}/upload?id=${id}`
   await ctx.reply(link)
 }
 
@@ -43,4 +43,4 @@ app.get("/upload", (req, res) => {
   res.send(file.buffer)
 })
 
-module.exports = app
+export default app
