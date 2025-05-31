@@ -41,20 +41,20 @@ bot.on(["document", "video", "animation", "photo"], async (ctx) => {
   const id = randomBytes(8).toString("hex")
   storage[id] = { buffer, name: file_name }
   const base = "https://image-uploader-bot.vercel.app"
-  const viewUrl = `${base}/view?id=${id}`
+  const viewUrl = `${base}/view?id=${id}` 
   const downloadUrl = `${base}/download?id=${id}`
 
   await ctx.reply(viewUrl, {
-    reply_to_message_id: ctx.message.message_id,
-    reply_markup: {
-      inline_keyboard: [[
-        { text: "👀 View", url: viewUrl },
-        { text: "👭 Share", switch_inline_query: viewUrl }
-      ], [
-        { text: "Developer", url: "https://telegram.dog/Flex_Coder" }
-      ]]
-    }
-  })
+  reply_to_message_id: ctx.message.message_id,
+  reply_markup: {
+    inline_keyboard: [[
+      { text: "👀 View", url: viewUrl },
+      { text: "👭 Share", switch_inline_query: viewUrl }
+    ], [
+      { text: "Developer", url: "https://telegram.dog/Flex_Coder" }
+    ]]
+  }
+})
 })
 
 app.use(bot.webhookCallback("/"))
