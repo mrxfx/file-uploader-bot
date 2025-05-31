@@ -6,6 +6,7 @@ import { randomBytes } from "crypto"
 const bot = new Telegraf(process.env.BOT_TOKEN)
 const app = express()
 const storage = {}
+const MAX_SIZE = 30 * 1024 * 1024
 
 bot.start(async (ctx) => {
   await ctx.telegram.sendChatAction(ctx.chat.id, "typing")
@@ -17,22 +18,37 @@ bot.start(async (ctx) => {
   )
 })
 
-bot.on(["document", "video", "animation", "photo"], async (ctx) => {
-  let file_id, file_name
+bot.on(["document", "video", "animation", "photo", "sticker"], async (ctx) => {
+  let file_id, file_name, file_size
 
   if (ctx.message.document) {
     file_id = ctx.message.document.file_id
     file_name = ctx.message.document.file_name
+    file_size = ctx.message.document.file_size
   } else if (ctx.message.video) {
     file_id = ctx.message.video.file_id
     file_name = "video.mp4"
+    file_size = ctx.message.video.file_size
   } else if (ctx.message.animation) {
     file_id = ctx.message.animation.file_id
     file_name = ctx.message.animation.file_name || "animation.gif"
+    file_size = ctx.message.animation.file_size
+  } else if (ctx.message.sticker) {
+    file_id = ctx.message.sticker.file_id
+    file_name = "sticker.webp"
+    file_size = ctx.message.sticker.file_size
   } else if (ctx.message.photo) {
     const photo = ctx.message.photo.at(-1)
     file_id = photo.file_id
     file_name = "image.jpg"
+    file_size = photo.file_size
+  }
+
+  if (file_size > MAX_SIZE) {
+    await ctx.reply("❌ File too large. Only files under 30 MB are allowed.", {
+      reply_to_message_id: ctx.message.message_id
+    })
+    return
   }
 
   const file = await ctx.telegram.getFile(file_id)
