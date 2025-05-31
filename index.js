@@ -2,6 +2,7 @@ import express from "express"
 import axios from "axios"
 import { Telegraf } from "telegraf"
 import { randomBytes } from "crypto"
+import mime from "mime-types"
 
 const bot = new Telegraf(process.env.BOT_TOKEN)
 const app = express()
@@ -61,6 +62,9 @@ app.use(bot.webhookCallback("/"))
 app.get("/upload", (req, res) => {
   const file = storage[req.query.id]
   if (!file) return res.status(404).send("File not found")
+
+  const type = mime.lookup(file.name) || "application/octet-stream"
+  res.setHeader("Content-Type", type)
   res.setHeader("Content-Disposition", `inline; filename="${file.name}"`)
   res.send(file.buffer)
 })
