@@ -43,4 +43,8 @@ app.get("/upload", (req, res) => {
   res.send(file.buffer)
 })
 
+app.get("/", (req, res) => {
+  res.send("Bot is running")
+})
+
 export default app
