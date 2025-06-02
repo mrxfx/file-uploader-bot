@@ -1,6 +1,6 @@
+
 export default {
-  BOT_TOKEN: "7784028733:AAFILq2JCqa1JlgWTpLbs3aHxa13DheuLeY",
-  ADMIN_ID: "6918300873",
-  FIREBASE_DB_URL: "https://flecdev-efed1-default-rtdb.firebaseio.com"
+  BOT_TOKEN: "YOUR_BOT_TOKEN",
+  ADMIN_ID: "YOUR_ADMIN_ID",
+  FIREBASE_DB_URL: "https://your-project-id.firebaseio.com"
 }
- 
