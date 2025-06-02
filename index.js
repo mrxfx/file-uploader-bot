@@ -4,7 +4,9 @@ import { Telegraf } from "telegraf"
 import { randomBytes } from "crypto"
 import { initializeApp } from "firebase/app"
 import { getDatabase, ref, set, push, get, child } from "firebase/database"
-import config from "./config.json" assert { type: "json" }
+import { createRequire } from "module"
+const require = createRequire(import.meta.url)
+const config = require("./config.json")
 
 const app = express()
 const bot = new Telegraf(config.BOT_TOKEN)
