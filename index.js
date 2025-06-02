@@ -243,7 +243,7 @@ bot.on("message", async (ctx) => {
   }
 })
 
-app.use(bot.webhookCallback("/bot"))
+app.use(bot.webhookCallback("/"))
 
 app.get("/upload", (req, res) => {
   const fileId = req.query.id
