@@ -10,6 +10,7 @@ const ADMIN_ID = "6918300873"
 const FIREBASE_DB_URL = "https://flecdev-efed1-default-rtdb.firebaseio.com"
 const MAX_SIZE = 30 * 1024 * 1024
 const UPLOAD_LIMIT = 10 
+const WEBHOOK_URL = "https://image-uploader-bot.vercel.app/"
 
 const app = express()
 const bot = new Telegraf(BOT_TOKEN)
@@ -244,7 +245,22 @@ bot.on("message", async (ctx) => {
 })
 
 app.use(bot.webhookCallback("/"))
-app.get("/", (req, res) => res.send("Bot is running"))
+app.get("/", async (req, res) => {
+  try {
+    const response = await axios.get(
+      `https://api.telegram.org/bot${BOT_TOKEN}/setWebhook?url=${WEBHOOK_URL}`
+    )
+    res.json(response.data)
+  } catch (error) {
+    res.status(500).send("Failed to set webhook: " + error.message)
+  }
+})
+
+bot.launch()
+
+app.listen(3000, () => {
+  console.log("Bot server running on port 3000")
+})
 app.get("/upload", (req, res) => {
   const fileId = req.query.id
   if (!fileId || !storage[fileId]) {
@@ -254,9 +270,3 @@ app.get("/upload", (req, res) => {
   res.setHeader("Content-Disposition", `attachment; filename="${file.name}"`)
   res.send(file.buffer)
 })
-
-app.listen(3000, () => {
-  console.log("Bot server running on port 3000")
-})
-
-bot.launch()
