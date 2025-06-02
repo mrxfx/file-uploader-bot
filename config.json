@@ -1,4 +1,3 @@
-
 export default {
   BOT_TOKEN: "YOUR_BOT_TOKEN",
   ADMIN_ID: "YOUR_ADMIN_ID",
