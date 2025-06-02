@@ -244,7 +244,7 @@ bot.on("message", async (ctx) => {
 })
 
 app.use(bot.webhookCallback("/"))
-
+app.get("/", (req, res) => res.send("Bot is running"))
 app.get("/upload", (req, res) => {
   const fileId = req.query.id
   if (!fileId || !storage[fileId]) {
