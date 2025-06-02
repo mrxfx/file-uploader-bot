@@ -3,17 +3,19 @@ import axios from "axios"
 import { Telegraf } from "telegraf"
 import { randomBytes } from "crypto"
 import { initializeApp } from "firebase/app"
-import { getDatabase, ref, set, push, get, child } from "firebase/database"
-import { createRequire } from "module"
-const require = createRequire(import.meta.url)
-const config = require("./config.json")
+import { getDatabase, ref, set, push, get } from "firebase/database"
+
+const BOT_TOKEN = "7784028733:AAFILq2JCqa1JlgWTpLbs3aHxa13DheuLeY"
+const ADMIN_ID = "6918300873"
+const FIREBASE_DB_URL = "https://flecdev-efed1-default-rtdb.firebaseio.com"
+const link = `https://image-uploader-bot.vercel.app/upload?id=${id}`
 
 const app = express()
-const bot = new Telegraf(config.BOT_TOKEN)
+const bot = new Telegraf(BOT_TOKEN)
 const MAX_SIZE = 30 * 1024 * 1024
 const storage = {}
 
-const firebaseApp = initializeApp({ databaseURL: config.FIREBASE_DB_URL })
+const firebaseApp = initializeApp({ databaseURL: FIREBASE_DB_URL })
 const db = getDatabase(firebaseApp)
 
 let broadcastMode = false
@@ -33,7 +35,7 @@ bot.start(async (ctx) => {
     const stat = await get(ref(db, "users"))
     const totalUsers = stat.exists() ? Object.keys(stat.val()).length : 1
     await bot.telegram.sendMessage(
-      config.ADMIN_ID,
+      ADMIN_ID,
       "➕ <b>New User Notification</b> ➕\n\n👤<b>User:</b> <a href='tg://user?id=" +
         user.telegramid +
         "'>" +
@@ -88,7 +90,7 @@ bot.on(["document", "video", "animation", "photo", "sticker"], async (ctx) => {
   }
 
   const file = await ctx.telegram.getFile(file_id)
-  const url = `https://api.telegram.org/file/bot${config.BOT_TOKEN}/${file.file_path}`
+  const url = `https://api.telegram.org/file/bot${BOT_TOKEN}/${file.file_path}`
   const buffer = (await axios.get(url, { responseType: "arraybuffer" })).data
   const id = randomBytes(8).toString("hex")
   storage[id] = { buffer, name: file_name }
@@ -100,19 +102,18 @@ bot.on(["document", "video", "animation", "photo", "sticker"], async (ctx) => {
     name: file_name
   })
 
-  const link = `https://image-uploader-bot.vercel.app/upload?id=${id}`
   await ctx.reply(link, { reply_to_message_id: ctx.message.message_id })
 })
 
 bot.command("broadcast", async (ctx) => {
-  if (ctx.from.id.toString() !== config.ADMIN_ID) return
+  if (ctx.from.id.toString() !== ADMIN_ID) return
   broadcastMode = true
   broadcastCtx = ctx
   await ctx.replyWithHTML("<b>Enter Broadcast Message Here 👇</b>")
 })
 
 bot.on("message", async (ctx) => {
-  if (broadcastMode && ctx.from.id.toString() === config.ADMIN_ID) {
+  if (broadcastMode && ctx.from.id.toString() === ADMIN_ID) {
     broadcastMode = false
     const usersRef = ref(db, "users")
     const snapshot = await get(usersRef)
