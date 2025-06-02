@@ -21,6 +21,7 @@ let broadcastMode = false
 const userUploadCounts = {}
 
 bot.start(async (ctx) => {
+bot.start(async (ctx) => {
   try {
     const user = {
       first_name: ctx.from.first_name || "User",
