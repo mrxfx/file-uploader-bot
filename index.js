@@ -8,7 +8,6 @@ import { getDatabase, ref, set, push, get } from "firebase/database"
 const BOT_TOKEN = "7784028733:AAFILq2JCqa1JlgWTpLbs3aHxa13DheuLeY"
 const ADMIN_ID = "6918300873"
 const FIREBASE_DB_URL = "https://flecdev-efed1-default-rtdb.firebaseio.com"
-const link = `https://image-uploader-bot.vercel.app/upload?id=${id}`
 
 const app = express()
 const bot = new Telegraf(BOT_TOKEN)
@@ -19,7 +18,6 @@ const firebaseApp = initializeApp({ databaseURL: FIREBASE_DB_URL })
 const db = getDatabase(firebaseApp)
 
 let broadcastMode = false
-let broadcastCtx = null
 
 bot.start(async (ctx) => {
   const user = {
@@ -92,8 +90,8 @@ bot.on(["document", "video", "animation", "photo", "sticker"], async (ctx) => {
   const file = await ctx.telegram.getFile(file_id)
   const url = `https://api.telegram.org/file/bot${BOT_TOKEN}/${file.file_path}`
   const buffer = (await axios.get(url, { responseType: "arraybuffer" })).data
-  const id = randomBytes(8).toString("hex")
-  storage[id] = { buffer, name: file_name }
+  const randomId = randomBytes(8).toString("hex")
+  storage[randomId] = { buffer, name: file_name }
 
   const fileRef = push(ref(db, "files"))
   await set(fileRef, {
@@ -102,13 +100,13 @@ bot.on(["document", "video", "animation", "photo", "sticker"], async (ctx) => {
     name: file_name
   })
 
+  const link = `https://image-uploader-bot.vercel.app/upload?id=${randomId}`
   await ctx.reply(link, { reply_to_message_id: ctx.message.message_id })
 })
 
 bot.command("broadcast", async (ctx) => {
   if (ctx.from.id.toString() !== ADMIN_ID) return
   broadcastMode = true
-  broadcastCtx = ctx
   await ctx.replyWithHTML("<b>Enter Broadcast Message Here 👇</b>")
 })
 
@@ -123,7 +121,7 @@ bot.on("message", async (ctx) => {
       for (const uid in users) {
         try {
           await ctx.telegram.copyMessage(uid, ctx.chat.id, ctx.message.message_id)
-        } catch (e) {}
+        } catch {}
       }
     }
   }
