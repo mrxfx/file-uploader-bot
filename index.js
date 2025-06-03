@@ -4,14 +4,13 @@ import { randomBytes } from "crypto"
 import bodyParser from "body-parser"
 import { Telegraf, session } from "telegraf"
 
-const BOT_TOKEN = "7784028733:AAHANG4AtqTcXhOSHtUT1x0_9q0XX98ultg"
+const BOT_TOKEN = "7784028733:AAHANG4AtqTCXhOSHtUT1x0_9q0XX98ultg"
 const VERCEL_URL = "https://image-uploader-bot.vercel.app"
 const FIREBASE_DB_URL = "https://flecdev-efed1-default-rtdb.firebaseio.com"
 const ADMIN_ID = "7320532917"
 
 const bot = new Telegraf(BOT_TOKEN)
 const app = express()
-const storage = {}
 const MAX_SIZE = 30 * 1024 * 1024
 
 app.use(bodyParser.json())
@@ -27,11 +26,15 @@ bot.start(async (ctx) => {
   const userData = { telegramid: id, first_name: name, date: Date.now() }
 
   try {
+    const existingUser = await axios.get(`${FIREBASE_DB_URL}/users/${id}.json`)
     await axios.put(`${FIREBASE_DB_URL}/users/${id}.json`, userData)
-    const res = await axios.get(`${FIREBASE_DB_URL}/users.json`)
-    const totalUsers = Object.keys(res.data || {}).length
-    const message = `➕ <b>New User Notification</b> ➕\n\n👤<b>User:</b> <a href="tg://user?id=${id}">${name}</a>\n\n🆔<b>User ID:</b> <code>${id}</code>\n\n🌝 <b>Total Users Count: ${totalUsers}</b>`
-    await bot.telegram.sendMessage(ADMIN_ID, message, { parse_mode: "HTML" })
+
+    if (!existingUser.data) {
+      const res = await axios.get(`${FIREBASE_DB_URL}/users.json`)
+      const totalUsers = Object.keys(res.data || {}).length
+      const message = `➕ <b>New User Notification</b> ➕\n\n👤<b>User:</b> <a href="tg://user?id=${id}">${name}</a>\n\n🆔<b>User ID:</b> <code>${id}</code>\n\n🌝 <b>Total Users Count: ${totalUsers}</b>`
+      await bot.telegram.sendMessage(ADMIN_ID, message, { parse_mode: "HTML" })
+    }
   } catch {}
 
   await ctx.replyWithHTML(
@@ -76,9 +79,7 @@ bot.on("message", async (ctx, next) => {
           await ctx.copyMessage(uid, ctx.chat.id, broadcastMsg)
           count++
           await new Promise(r => setTimeout(r, 300))
-        } catch (e) {
-          console.error(`Failed to send message to ${uid}: ${e.message}`)
-        }
+        } catch {}
       }
       await ctx.reply(`✅ Broadcast sent to ${count} users.`)
     } catch (e) {
@@ -126,7 +127,18 @@ bot.on(["document", "video", "photo", "sticker", "animation"], async (ctx) => {
   const url = `https://api.telegram.org/file/bot${BOT_TOKEN}/${file.file_path}`
   const buffer = (await axios.get(url, { responseType: 'arraybuffer' })).data
   const id = randomBytes(8).toString("hex")
-  storage[id] = { buffer, name: file_name }
+
+  const uploadData = {
+    id,
+    file_name,
+    file_buffer: buffer.toString("base64"),
+    content_type: ctx.message.document?.mime_type || "application/octet-stream"
+  }
+
+  try {
+    await axios.put(`${FIREBASE_DB_URL}/uploads/${id}.json`, uploadData)
+  } catch {}
+
   const link = `${VERCEL_URL}/upload?id=${id}`
 
   try {
@@ -145,11 +157,19 @@ app.get("/webhook", (req, res) => {
   res.json({ status: "Webhook is live ✅" })
 })
 
-app.get("/upload", (req, res) => {
-  const file = storage[req.query.id]
-  if (!file) return res.status(404).send("File not found")
-  res.setHeader("Content-Disposition", `attachment; filename="${file.name}"`)
-  res.send(file.buffer)
+app.get("/upload", async (req, res) => {
+  try {
+    const id = req.query.id
+    const response = await axios.get(`${FIREBASE_DB_URL}/uploads/${id}.json`)
+    const file = response.data
+    if (!file) return res.status(404).send("File not found")
+    const buffer = Buffer.from(file.file_buffer, "base64")
+    res.setHeader("Content-Disposition", `attachment; filename="${file.file_name}"`)
+    res.setHeader("Content-Type", file.content_type || "application/octet-stream")
+    res.send(buffer)
+  } catch {
+    res.status(404).send("File not found")
+  }
 })
 
 export default app
