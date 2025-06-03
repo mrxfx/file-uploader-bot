@@ -22,7 +22,6 @@ let broadcastMode = false
 const userUploadCounts = {}
 
 bot.start(async (ctx) => {
-bot.start(async (ctx) => {
   try {
     const user = {
       first_name: ctx.from.first_name || "User",
@@ -38,56 +37,24 @@ bot.start(async (ctx) => {
       const stat = await get(ref(db, "users"));
       const totalUsers = stat.exists() ? Object.keys(stat.val()).length : 1;
 
-      try {
-        await bot.telegram.sendMessage(
-          ADMIN_ID,
-          `➕ <b>New User Notification</b> ➕\n\n👤<b>User:</b> <a href="tg://user?id=${user.telegramid}">${user.first_name}</a>\n\n🆔<b>User ID:</b> <code>${user.telegramid}</code>\n\n🌝 <b>Total Users Count: ${totalUsers}</b>`,
-          { parse_mode: "HTML" }
-        );
-      } catch (adminErr) {
-        console.error("Failed to notify admin:", adminErr);
-      }
+      await bot.telegram.sendMessage(
+        ADMIN_ID,
+        `➕ <b>New User Notification</b> ➕\n\n👤<b>User:</b> <a href="tg://user?id=${user.telegramid}">${user.first_name}</a>\n\n🆔<b>User ID:</b> <code>${user.telegramid}</code>\n\n🌝 <b>Total Users Count: ${totalUsers}</b>`,
+        { parse_mode: "HTML" }
+      );
     }
 
     await ctx.telegram.sendChatAction(ctx.chat.id, "typing");
 
-    const replyId = ctx.message?.message_id || undefined;
-
     await ctx.replyWithHTML(
       `👋 <b>Welcome <a href="tg://user?id=${user.telegramid}">${user.first_name}</a>!\n\nSend me any file under 30 MB and I'll host it for you. You can optionally send "delete = true <seconds>" to auto-delete the file after that time.</b>`,
-      { reply_to_message_id: replyId }
+      { reply_to_message_id: ctx.message.message_id }
     );
   } catch (err) {
     console.error("Error in /start handler:", err);
   }
 });
 
-  const userRef = ref(db, "users/" + user.telegramid)
-  const snapshot = await get(userRef)
-  if (!snapshot.exists()) {
-    await set(userRef, user)
-    const stat = await get(ref(db, "users"))
-    const totalUsers = stat.exists() ? Object.keys(stat.val()).length : 1
-    await bot.telegram.sendMessage(
-      ADMIN_ID,
-      "➕ <b>New User Notification</b> ➕\n\n👤<b>User:</b> <a href='tg://user?id=" +
-        user.telegramid +
-        "'>" +
-        user.first_name +
-        "</a>\n\n🆔<b> User ID :</b> <code>" +
-        user.telegramid +
-        "</code>\n\n🌝 <b>Total User's Count: " +
-        totalUsers +
-        "</b>",
-      { parse_mode: "HTML" }
-    )
-  }
-  await ctx.telegram.sendChatAction(ctx.chat.id, "typing")
-  await ctx.replyWithHTML(
-    `👋<b>Welcome <a href="tg://user?id=${user.telegramid}">${user.first_name}</a>,\n\nSend me any file under 30 MB and I'll host it for you. You can optionally send "delete = true <seconds>" to auto-delete the file after that time.</b>`,
-    { reply_to_message_id: ctx.message.message_id }
-  )
-})
 
 bot.on(["document", "video", "animation", "photo", "sticker"], async (ctx) => {
   const userId = ctx.from.id.toString()
