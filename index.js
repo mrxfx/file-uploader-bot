@@ -132,12 +132,15 @@ bot.on(["document", "video", "animation", "photo", "sticker"], async (ctx) => {
 })
 
 app.use(bot.webhookCallback("/"))
+app.get("/webhook", (req, res) => {
+  res.json({ status: "Webhook is live ✅" });
+});
 
 app.get("/upload", (req, res) => {
-  const file = storage[req.query.id]
-  if (!file) return res.status(404).send("File not found")
-  res.setHeader("Content-Disposition", `attachment; filename="${file.name}"`)
-  res.send(file.buffer)
-})
+  const file = storage[req.query.id];
+  if (!file) return res.status(404).send("File not found");
+  res.setHeader("Content-Disposition", `attachment; filename="${file.name}"`);
+  res.send(file.buffer);
+});
 
-export default app
+export default app;
