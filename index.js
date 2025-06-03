@@ -3,6 +3,7 @@ import axios from "axios"
 import { Telegraf } from "telegraf"
 import { randomBytes } from "crypto"
 import bodyParser from "body-parser"
+import session from "telegraf/session"
 
 const BOT_TOKEN = "7784028733:AAHANG4AtqTcXhOSHtUT1x0_9q0XX98ultg"
 const VERCEL_URL = "https://image-uploader-bot.vercel.app"
@@ -16,6 +17,8 @@ const MAX_SIZE = 30 * 1024 * 1024
 
 app.use(bodyParser.json())
 app.use(bot.webhookCallback("/"))
+
+bot.use(session())
 
 bot.telegram.setWebhook(`${VERCEL_URL}/`)
 
@@ -53,7 +56,6 @@ bot.command("webhook", async (ctx) => {
 
 bot.command("broadcast", async (ctx) => {
   if (ctx.from.id.toString() !== ADMIN_ID) return
-  ctx.session = ctx.session || {}
   ctx.session.broadcast = true
   await ctx.reply("<b>Enter Broadcast Message Here 👇</b>", {
     parse_mode: "HTML",
@@ -69,12 +71,20 @@ bot.on("message", async (ctx, next) => {
     try {
       const res = await axios.get(`${FIREBASE_DB_URL}/users.json`)
       const users = res.data || {}
+      let count = 0
       for (const uid of Object.keys(users)) {
         try {
           await ctx.copyMessage(uid, ctx.chat.id, broadcastMsg)
-        } catch {}
+          count++
+          await new Promise(r => setTimeout(r, 300))
+        } catch (e) {
+          console.error(`Failed to send message to ${uid}: ${e.message}`)
+        }
       }
-    } catch {}
+      await ctx.reply(`✅ Broadcast sent to ${count} users.`)
+    } catch (e) {
+      await ctx.reply(`❌ Broadcast failed: ${e.message}`)
+    }
   } else {
     await next()
   }
