@@ -12,14 +12,22 @@ const ADMIN_ID = "7320532917"
 const bot = new Telegraf(BOT_TOKEN)
 const app = express()
 const MAX_SIZE = 30 * 1024 * 1024
+const fileStorage = {}
 
 app.use(bodyParser.json({ limit: "50mb" }))
 
 app.use(bot.webhookCallback("/"))
 
-bot.use(session())
+app.get("/webhook", async (req, res) => {
+  try {
+    await bot.telegram.setWebhook(`${VERCEL_URL}/`)
+    res.send("Webhook set successfully")
+  } catch (e) {
+    res.status(500).send("Error setting webhook: " + e.message)
+  }
+})
 
-bot.telegram.setWebhook(`${VERCEL_URL}/`)
+bot.use(session())
 
 bot.start(async (ctx) => {
   const id = ctx.from.id
@@ -29,30 +37,17 @@ bot.start(async (ctx) => {
     const existing = await axios.get(`${FIREBASE_DB_URL}/users/${id}.json`)
     if (!existing.data) {
       await axios.put(`${FIREBASE_DB_URL}/users/${id}.json`, userData)
-      const res = await axios.get(`${FIREBASE_DB_URL}/users.json`)
-      const totalUsers = Object.keys(res.data || {}).length
+      const resUsers = await axios.get(`${FIREBASE_DB_URL}/users.json`)
+      const totalUsers = Object.keys(resUsers.data || {}).length
       const message = `➕ <b>New User Notification</b> ➕\n\n👤<b>User:</b> <a href="tg://user?id=${id}">${name}</a>\n\n🆔<b>User ID:</b> <code>${id}</code>\n\n🌝 <b>Total Users Count: ${totalUsers}</b>`
       await bot.telegram.sendMessage(ADMIN_ID, message, { parse_mode: "HTML" })
     }
   } catch {}
 
   await ctx.replyWithHTML(
-    `👋<b>Welcome <a href="tg://user?id=${id}">${name}</a>,\n\nSend me any file less than 30 MB and I will host it for you.</b>`,
+    `👋<b>Welcome <a href="tg://user?id=${id}">${name}</a>,\n\nI am here to host your file for free. Share me file which should be less than 30 mb</b>`,
     { reply_to_message_id: ctx.message.message_id }
   )
-})
-
-bot.command("webhook", async (ctx) => {
-  try {
-    await bot.telegram.setWebhook(`${VERCEL_URL}/`)
-    ctx.reply(JSON.stringify({ status: "Webhook set successfully" }), {
-      reply_to_message_id: ctx.message.message_id
-    })
-  } catch (e) {
-    ctx.reply(JSON.stringify({ error: e.message }), {
-      reply_to_message_id: ctx.message.message_id
-    })
-  }
 })
 
 bot.command("broadcast", async (ctx) => {
@@ -123,42 +118,32 @@ bot.on(["document", "video", "photo", "sticker", "animation"], async (ctx) => {
 
   const file = await ctx.telegram.getFile(file_id)
   const url = `https://api.telegram.org/file/bot${BOT_TOKEN}/${file.file_path}`
-
+  const buffer = (await axios.get(url, { responseType: 'arraybuffer' })).data
   const id = randomBytes(8).toString("hex")
-
-  await axios.post(`${FIREBASE_DB_URL}/links.json`, {
-    id,
-    name: ctx.from.first_name,
-    telegram_id: ctx.from.id,
-    time: Date.now(),
-    file_name,
-    telegram_file_url: url
-  })
-
+  fileStorage[id] = { buffer, name: file_name }
   const link = `${VERCEL_URL}/upload?id=${id}`
+
+  try {
+    await axios.post(`${FIREBASE_DB_URL}/links.json`, {
+      link,
+      name: ctx.from.first_name,
+      id: ctx.from.id,
+      time: Date.now()
+    })
+  } catch {}
+
   await ctx.reply(link, { reply_to_message_id: ctx.message.message_id })
 })
 
-app.get("/upload", async (req, res) => {
+app.get("/upload", (req, res) => {
   const id = req.query.id
-  if (!id) return res.status(400).send("Missing id")
-
-  try {
-    const linksRes = await axios.get(`${FIREBASE_DB_URL}/links.json`)
-    const links = linksRes.data || {}
-    const entry = Object.values(links).find(e => e.id === id)
-    if (!entry) return res.status(404).send("File not found")
-
-    const fileUrl = entry.telegram_file_url
-    if (!fileUrl) return res.status(404).send("File URL not found")
-
-    const fileResp = await axios.get(fileUrl, { responseType: "stream" })
-    res.setHeader("Content-Disposition", `attachment; filename="${entry.file_name}"`)
-    res.setHeader("Content-Type", "application/octet-stream")
-    fileResp.data.pipe(res)
-  } catch {
-    res.status(500).send("Server error")
+  if (!id || !fileStorage[id]) {
+    return res.status(404).send("File not found")
   }
+  const file = fileStorage[id]
+  res.setHeader("Content-Disposition", `attachment; filename="${file.name}"`)
+  res.setHeader("Content-Type", "application/octet-stream")
+  res.send(file.buffer)
 })
 
 export default app
