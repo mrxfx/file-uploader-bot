@@ -3,7 +3,7 @@ import axios from "axios"
 import { Telegraf } from "telegraf"
 import { randomBytes } from "crypto"
 
-const BOT_TOKEN = "7784028733:AAHANG4AtqTcXhOSHtUT1x0_9q0XX98ultg"
+const BOT_TOKEN = "7784028733:AAGcafv9whKIYgcn6yqp7ebylVCfGV3pL6g"
 const VERCEL_URL = "https://image-uploader-bot.vercel.app"
 const FIREBASE_DB_URL = "https://flecdev-efed1-default-rtdb.firebaseio.com"
 const ADMIN_ID = "6918300873"
@@ -13,19 +13,22 @@ const app = express()
 const storage = {}
 const MAX_SIZE = 30 * 1024 * 1024
 
-app.get("/webhook", async (req, res) => {
+bot.command("webhook", async (ctx) => {
   try {
     await bot.telegram.setWebhook(`${VERCEL_URL}`)
-    res.json({ status: "Webhook set successfully" })
-  } catch {
-    res.json({ error: "Failed to set webhook" })
+    await ctx.reply(JSON.stringify({ status: "Webhook set successfully" }), {
+      reply_to_message_id: ctx.message.message_id
+    })
+  } catch (e) {
+    await ctx.reply(JSON.stringify({ error: "Failed to set webhook" }), {
+      reply_to_message_id: ctx.message.message_id
+    })
   }
 })
 
 bot.start(async (ctx) => {
   const id = ctx.from.id
   const name = ctx.from.first_name
-  await ctx.telegram.sendChatAction(id, "typing")
 
   const userData = {
     telegramid: id,
@@ -37,7 +40,9 @@ bot.start(async (ctx) => {
     await axios.put(`${FIREBASE_DB_URL}/users/${id}.json`, userData)
     const res = await axios.get(`${FIREBASE_DB_URL}/users.json`)
     const totalUsers = Object.keys(res.data || {}).length
+
     const message = `➕ <b>New User Notification</b> ➕\n\n👤<b>User:</b> <a href="tg://user?id=${id}">${name}</a>\n\n🆔<b>User ID:</b> <code>${id}</code>\n\n🌝 <b>Total Users Count: ${totalUsers}</b>`
+
     await bot.telegram.sendMessage(ADMIN_ID, message, { parse_mode: "HTML" })
   } catch {}
 
@@ -51,7 +56,10 @@ bot.command("broadcast", async (ctx) => {
   if (ctx.from.id.toString() !== ADMIN_ID) return
   ctx.session = ctx.session || {}
   ctx.session.broadcast = true
-  await ctx.reply("<b>Enter Broadcast Message Here 👇</b>", { parse_mode: "HTML" })
+  await ctx.reply("<b>Enter Broadcast Message Here 👇</b>", {
+    parse_mode: "HTML",
+    reply_to_message_id: ctx.message.message_id
+  })
 })
 
 bot.on("message", async (ctx, next) => {
