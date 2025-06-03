@@ -3,6 +3,16 @@ import axios from "axios"
 import { randomBytes } from "crypto"
 import bodyParser from "body-parser"
 import { Telegraf, session } from "telegraf"
+import admin from "firebase-admin"
+
+const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT_JSON)
+
+admin.initializeApp({
+  credential: admin.credential.cert(serviceAccount),
+  storageBucket: "flecdev-efed1.appspot.com"
+})
+
+const bucket = admin.storage().bucket()
 
 const BOT_TOKEN = "7784028733:AAHANG4AtqTcXhOSHtUT1x0_9q0XX98ultg"
 const VERCEL_URL = "https://image-uploader-bot.vercel.app"
@@ -11,14 +21,11 @@ const ADMIN_ID = "7320532917"
 
 const bot = new Telegraf(BOT_TOKEN)
 const app = express()
-const storage = {}
 const MAX_SIZE = 30 * 1024 * 1024
 
 app.use(bodyParser.json({ limit: "50mb" }))
 
-app.use(bot.webhookCallback("/"), (req, res) => {
-  res.status(200).send("OK")
-})
+app.use(bot.webhookCallback("/"))
 
 bot.use(session())
 
@@ -126,32 +133,47 @@ bot.on(["document", "video", "photo", "sticker", "animation"], async (ctx) => {
 
   const file = await ctx.telegram.getFile(file_id)
   const url = `https://api.telegram.org/file/bot${BOT_TOKEN}/${file.file_path}`
-  const buffer = (await axios.get(url, { responseType: 'arraybuffer' })).data
+  const response = await axios.get(url, { responseType: "arraybuffer" })
+  const buffer = response.data
   const id = randomBytes(8).toString("hex")
-  storage[id] = { buffer, name: file_name }
+  const fileUpload = bucket.file(`${id}-${file_name}`)
+  await fileUpload.save(buffer, { resumable: false, contentType: "application/octet-stream" })
+  await fileUpload.makePublic()
+  const publicUrl = `https://storage.googleapis.com/${bucket.name}/${fileUpload.name}`
+
+  await axios.post(`${FIREBASE_DB_URL}/links.json`, {
+    id,
+    name: ctx.from.first_name,
+    telegram_id: ctx.from.id,
+    time: Date.now(),
+    file_name,
+    publicUrl
+  })
+
   const link = `${VERCEL_URL}/upload?id=${id}`
-
-  try {
-    await axios.post(`${FIREBASE_DB_URL}/links.json`, {
-      link,
-      name: ctx.from.first_name,
-      id: ctx.from.id,
-      time: Date.now()
-    })
-  } catch {}
-
   await ctx.reply(link, { reply_to_message_id: ctx.message.message_id })
 })
 
-app.get("/upload", (req, res) => {
-  const id = req.query.id;
-  if (!id || !storage[id]) {
-    return res.status(404).send("File not found");
+app.get("/upload", async (req, res) => {
+  const id = req.query.id
+  if (!id) return res.status(400).send("Missing id")
+
+  try {
+    const linksRes = await axios.get(`${FIREBASE_DB_URL}/links.json`)
+    const links = linksRes.data || {}
+    const entry = Object.values(links).find(e => e.id === id)
+    if (!entry) return res.status(404).send("File not found")
+
+    const fileUrl = entry.publicUrl
+    if (!fileUrl) return res.status(404).send("File URL not found")
+
+    const fileResp = await axios.get(fileUrl, { responseType: "stream" })
+    res.setHeader("Content-Disposition", `attachment; filename="${entry.file_name}"`)
+    res.setHeader("Content-Type", "application/octet-stream")
+    fileResp.data.pipe(res)
+  } catch {
+    res.status(500).send("Server error")
   }
-  const file = storage[id];
-  res.setHeader("Content-Disposition", `attachment; filename="${file.name}"`);
-  res.setHeader("Content-Type", "application/octet-stream");
-  res.send(file.buffer);
-});
+})
 
 export default app
