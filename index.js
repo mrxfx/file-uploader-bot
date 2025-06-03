@@ -43,7 +43,16 @@ async function getTotalUsers() {
 bot.start(async (ctx) => {
   const id = ctx.from.id
   const name = ctx.from.first_name
-  await axios.put(`${FIREBASE_DB_URL}/users/${id}.json`, { telegramid: id, first_name: name, date: Date.now() }).catch(() => {})
+  const userRef = `${FIREBASE_DB_URL}/users/${id}.json`
+
+  try {
+    const { data: existing } = await axios.get(userRef)
+    if (!existing) {
+      await axios.put(userRef, { telegramid: id, first_name: name, date: Date.now() })
+      await bot.telegram.sendMessage(ADMIN_ID, `👤 New user started bot: ${name} (${id})`)
+    }
+  } catch {}
+
   await ctx.reply("👋 Welcome! Use the buttons below to navigate.", {
     reply_markup: buttonsMain
   })
@@ -234,8 +243,10 @@ app.get("/", (req, res) => res.send("Bot is running."))
 app.get("/webhook", async (req, res) => {
   try {
     await bot.telegram.setWebhook(`${VERCEL_URL}/webhook`)
-    res.json({ status: "success", message: "Webhook set to " + `${VERCEL_URL}/webhook` })
+    res.json({ status: "success", message: "Webhook set to " + `${VERCEL_URL}/` })
   } catch (e) {
     res.json({ status: "error", message: e.message || e.toString() })
   }
 })
+
+export default app
