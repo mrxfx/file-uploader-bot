@@ -3,17 +3,24 @@ import axios from "axios"
 import { Telegraf } from "telegraf"
 import { randomBytes } from "crypto"
 
-const bot = new Telegraf(process.env.BOT_TOKEN)
+const BOT_TOKEN = "7784028733:AAGcafv9whKIYgcn6yqp7ebylVCfGV3pL6g"
+const VERCEL_URL = "https://image-uploader-bot.vercel.app"
+const bot = new Telegraf(BOT_TOKEN)
 const app = express()
 const storage = {}
 const MAX_SIZE = 30 * 1024 * 1024
+
+bot.command("/", async (ctx) => {
+  await bot.telegram.setWebhook(`${VERCEL_URL}`)
+  await ctx.reply("✅ Webhook set successfully.")
+})
 
 bot.start(async (ctx) => {
   await ctx.telegram.sendChatAction(ctx.chat.id, "typing")
   const name = ctx.from.first_name
   const id = ctx.from.id
   await ctx.replyWithHTML(
-    👋<b>Welcome <a href="tg://user?id=${id}">${name}</a>,\n\nI am here to host your file for free. Share me file which should be less than 30 mb</b>,
+    `👋<b>Welcome <a href="tg://user?id=${id}">${name}</a>,\n\nI am here to host your file for free. Share me file which should be less than 30 mb</b>`,
     { reply_to_message_id: ctx.message.message_id }
   )
 })
@@ -52,11 +59,11 @@ bot.on(["document", "video", "animation", "photo", "sticker"], async (ctx) => {
   }
 
   const file = await ctx.telegram.getFile(file_id)
-  const url = https://api.telegram.org/file/bot${process.env.BOT_TOKEN}/${file.file_path}
+  const url = `https://api.telegram.org/file/bot${BOT_TOKEN}/${file.file_path}`
   const buffer = (await axios.get(url, { responseType: 'arraybuffer' })).data
   const id = randomBytes(8).toString("hex")
   storage[id] = { buffer, name: file_name }
-  const link = https://image-uploader-bot.vercel.app/upload?id=${id}
+  const link = `${VERCEL_URL}/upload?id=${id}`
   await ctx.reply(link, { reply_to_message_id: ctx.message.message_id })
 })
 
@@ -65,13 +72,8 @@ app.use(bot.webhookCallback("/"))
 app.get("/upload", (req, res) => {
   const file = storage[req.query.id]
   if (!file) return res.status(404).send("File not found")
-  res.setHeader("Content-Disposition", attachment; filename="${file.name}")
+  res.setHeader("Content-Disposition", `attachment; filename="${file.name}"`)
   res.send(file.buffer)
 })
 
 export default app
-
-
-
-4/4
-
