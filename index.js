@@ -3,16 +3,6 @@ import axios from "axios"
 import { randomBytes } from "crypto"
 import bodyParser from "body-parser"
 import { Telegraf, session } from "telegraf"
-import admin from "firebase-admin"
-
-const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT_JSON)
-
-admin.initializeApp({
-  credential: admin.credential.cert(serviceAccount),
-  storageBucket: "flecdev-efed1.appspot.com"
-})
-
-const bucket = admin.storage().bucket()
 
 const BOT_TOKEN = "7784028733:AAHANG4AtqTcXhOSHtUT1x0_9q0XX98ultg"
 const VERCEL_URL = "https://image-uploader-bot.vercel.app"
@@ -47,7 +37,7 @@ bot.start(async (ctx) => {
   } catch {}
 
   await ctx.replyWithHTML(
-    `👋<b>Welcome <a href="tg://user?id=${id}">${name}</a>,\n\nI am here to host your file for free. Share me file which should be less than 30 mb</b>`,
+    `👋<b>Welcome <a href="tg://user?id=${id}">${name}</a>,\n\nSend me any file less than 30 MB and I will host it for you.</b>`,
     { reply_to_message_id: ctx.message.message_id }
   )
 })
@@ -133,13 +123,8 @@ bot.on(["document", "video", "photo", "sticker", "animation"], async (ctx) => {
 
   const file = await ctx.telegram.getFile(file_id)
   const url = `https://api.telegram.org/file/bot${BOT_TOKEN}/${file.file_path}`
-  const response = await axios.get(url, { responseType: "arraybuffer" })
-  const buffer = response.data
+
   const id = randomBytes(8).toString("hex")
-  const fileUpload = bucket.file(`${id}-${file_name}`)
-  await fileUpload.save(buffer, { resumable: false, contentType: "application/octet-stream" })
-  await fileUpload.makePublic()
-  const publicUrl = `https://storage.googleapis.com/${bucket.name}/${fileUpload.name}`
 
   await axios.post(`${FIREBASE_DB_URL}/links.json`, {
     id,
@@ -147,7 +132,7 @@ bot.on(["document", "video", "photo", "sticker", "animation"], async (ctx) => {
     telegram_id: ctx.from.id,
     time: Date.now(),
     file_name,
-    publicUrl
+    telegram_file_url: url
   })
 
   const link = `${VERCEL_URL}/upload?id=${id}`
@@ -164,7 +149,7 @@ app.get("/upload", async (req, res) => {
     const entry = Object.values(links).find(e => e.id === id)
     if (!entry) return res.status(404).send("File not found")
 
-    const fileUrl = entry.publicUrl
+    const fileUrl = entry.telegram_file_url
     if (!fileUrl) return res.status(404).send("File URL not found")
 
     const fileResp = await axios.get(fileUrl, { responseType: "stream" })
