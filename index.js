@@ -15,7 +15,6 @@ const bot = new Telegraf(BOT_TOKEN)
 const app = express()
 app.use(bodyParser.json())
 bot.use(session())
-bot.telegram.setWebhook(`${VERCEL_URL}/`)
 
 const buttonsMain = Markup.inlineKeyboard([
   [Markup.button.callback("📁 My Files", "MY_FILES"), Markup.button.callback("🗑️ Delete Files", "DELETE_FILES")],
@@ -46,29 +45,28 @@ bot.start(async (ctx) => {
   const name = ctx.from.first_name
   await axios.put(`${FIREBASE_DB_URL}/users/${id}.json`, { telegramid: id, first_name: name, date: Date.now() }).catch(() => {})
   await ctx.reply("👋 Welcome! Use the buttons below to navigate.", {
-    reply_to_message_id: ctx.message?.message_id,
     reply_markup: buttonsMain
   })
 })
 
 bot.action("HELP", async (ctx) => {
-  await ctx.editMessageText(
-    `
+  await ctx.editMessageText(`
 🤖 <b>Image Uploader Bot Help</b>
 
 📤 Send any file under 30MB to upload and get a permanent URL.
 📁 View or delete your files with buttons.
 🏓 Use Ping to check bot status.
-`,
-    { parse_mode: "HTML", reply_markup: buttonsMain }
-  )
+`, {
+    parse_mode: "HTML",
+    reply_markup: buttonsMain
+  })
   await ctx.answerCbQuery()
 })
 
 bot.action("PING", async (ctx) => {
   const start = Date.now()
   await ctx.answerCbQuery()
-  const msg = await ctx.editMessageText("🏓 Pinging...")
+  await ctx.editMessageText("🏓 Pinging...")
   const latency = Date.now() - start
   await ctx.editMessageText(`🏓 Pong! Latency: <b>${latency} ms</b>`, { parse_mode: "HTML", reply_markup: buttonsMain })
 })
@@ -81,17 +79,13 @@ bot.action("MY_FILES", async (ctx) => {
     await ctx.editMessageText("📁 You have no uploaded files.", { reply_markup: buttonsMain })
     return
   }
-  const lines = userLinks.map(([key, val], i) => `${i + 1}. ${val.link}`)
-  const txtContent = lines.join("\n")
-  const buffer = Buffer.from(txtContent, "utf-8")
   await ctx.editMessageText(`📁 You have <b>${userLinks.length}</b> uploaded files. Use buttons below to manage.`, {
     parse_mode: "HTML",
     reply_markup: Markup.inlineKeyboard(
       userLinks.map(([key], i) => [Markup.button.callback(`❌ Delete #${i + 1}`, `DEL_${key}`)])
-      .concat([[Markup.button.callback("⬅️ Back", "BACK")]])
+        .concat([[Markup.button.callback("⬅️ Back", "BACK")]])
     )
   })
-  ctx.session.userFileBuffer = buffer
 })
 
 bot.action(/^DEL_(.+)$/, async (ctx) => {
@@ -132,27 +126,10 @@ bot.action("BACK", async (ctx) => {
   await ctx.editMessageText("👋 Welcome! Use the buttons below to navigate.", { reply_markup: buttonsMain })
 })
 
-bot.command("myfiles", async (ctx) => {
-  const id = ctx.from.id
-  const userLinks = await getUserLinks(id)
-  if (userLinks.length === 0) {
-    await ctx.reply("📁 You have no uploaded files yet.", { reply_to_message_id: ctx.message?.message_id })
-    return
-  }
-  const lines = userLinks.map(([, v], i) => `${i + 1}. ${v.link}`)
-  const txtContent = lines.join("\n")
-  const buffer = Buffer.from(txtContent, "utf-8")
-  await ctx.replyWithDocument({ source: buffer, filename: "my_uploaded_files.txt" }, {
-    caption: `📁 Your Uploaded Files (${userLinks.length} total)`,
-    parse_mode: "HTML",
-    reply_to_message_id: ctx.message?.message_id
-  })
-})
-
 bot.command("broadcast", async (ctx) => {
   if (ctx.from.id.toString() !== ADMIN_ID) return
   ctx.session.broadcast = true
-  await ctx.reply("📢 Send the broadcast message or media now.", { reply_to_message_id: ctx.message?.message_id })
+  await ctx.reply("📢 Send the broadcast message or media now.")
 })
 
 bot.on("message", async (ctx, next) => {
@@ -166,9 +143,9 @@ bot.on("message", async (ctx, next) => {
           await ctx.copyMessage(uid, ctx.chat.id, ctx.message.message_id)
         } catch {}
       }
-      await ctx.reply("✅ Broadcast sent to all users.", { reply_to_message_id: ctx.message?.message_id })
+      await ctx.reply("✅ Broadcast sent to all users.")
     } catch {
-      await ctx.reply("❌ Failed to send broadcast.", { reply_to_message_id: ctx.message?.message_id })
+      await ctx.reply("❌ Failed to send broadcast.")
     }
   } else {
     await next()
@@ -179,7 +156,7 @@ bot.on(["document", "video", "photo", "sticker", "animation"], async (ctx) => {
   const id = ctx.from.id
   const userLinks = await getUserLinks(id)
   if (userLinks.length >= MAX_FILES_PER_USER) {
-    await ctx.reply(`❌ Max upload limit (${MAX_FILES_PER_USER}) reached.`, { reply_to_message_id: ctx.message?.message_id })
+    await ctx.reply(`❌ Max upload limit (${MAX_FILES_PER_USER}) reached.`)
     return
   }
 
@@ -209,7 +186,7 @@ bot.on(["document", "video", "photo", "sticker", "animation"], async (ctx) => {
   }
 
   if (file_size > MAX_SIZE) {
-    await ctx.reply("❌ File too large. Only files under 30 MB allowed.", { reply_to_message_id: ctx.message?.message_id })
+    await ctx.reply("❌ File too large. Only files under 30 MB allowed.")
     return
   }
 
@@ -229,40 +206,36 @@ bot.on(["document", "video", "photo", "sticker", "animation"], async (ctx) => {
 
   await ctx.reply(`✅ File uploaded!\n🔗 [Open Link](${VERCEL_URL}/upload?id=${key})`, {
     parse_mode: "Markdown",
-    reply_to_message_id: ctx.message?.message_id,
     reply_markup: Markup.inlineKeyboard([
       [Markup.button.url("🔗 Open Link", `${VERCEL_URL}/upload?id=${key}`)]
     ])
   })
 })
 
-app.get("/upload", (req, res) => {
+app.use(bot.webhookCallback("/webhook"))
+
+app.get("/upload", async (req, res) => {
   const id = req.query.id
   if (!id) return res.status(404).send("File not found.")
-  axios.get(`${FIREBASE_DB_URL}/links/${id}.json`).then(({ data }) => {
-    if (!data) return res.status(404).send("File not found.")
-    const { name } = data
-    if (!bot.session?.storage || !bot.session.storage[id]) {
-      return res.status(404).send("File buffer not found in session.")
-    }
-    const { buffer } = bot.session.storage[id]
-    res.setHeader("Content-Disposition", `attachment; filename="${name}"`)
-    res.setHeader("Content-Type", "application/octet-stream")
-    res.send(buffer)
-  }).catch(() => res.status(404).send("File not found."))
+  const { data } = await axios.get(`${FIREBASE_DB_URL}/links/${id}.json`).catch(() => ({}))
+  if (!data) return res.status(404).send("File not found.")
+  const { name } = data
+  if (!bot.session?.storage || !bot.session.storage[id]) {
+    return res.status(404).send("File buffer not found in session.")
+  }
+  const { buffer } = bot.session.storage[id]
+  res.setHeader("Content-Disposition", `attachment; filename="${name}"`)
+  res.setHeader("Content-Type", "application/octet-stream")
+  res.send(buffer)
 })
 
 app.get("/", (req, res) => res.send("Bot is running."))
 
-app.listen(process.env.PORT || 3000, () => {
-  console.log("Server running.")
-})
 app.get("/webhook", async (req, res) => {
   try {
-    await bot.telegram.setWebhook(`${VERCEL_URL}`);
-    res.json({ status: "success", message: "Webhook set to " + `${VERCEL_URL}/` });
+    await bot.telegram.setWebhook(`${VERCEL_URL}/webhook`)
+    res.json({ status: "success", message: "Webhook set to " + `${VERCEL_URL}/webhook` })
   } catch (e) {
-    res.json({ status: "error", message: e.message || e.toString() });
+    res.json({ status: "error", message: e.message || e.toString() })
   }
-});
-bot.launch()
+})
