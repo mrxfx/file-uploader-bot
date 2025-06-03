@@ -257,5 +257,12 @@ app.get("/", (req, res) => res.send("Bot is running."))
 app.listen(process.env.PORT || 3000, () => {
   console.log("Server running.")
 })
-
+app.get("/webhook", async (req, res) => {
+  try {
+    await bot.telegram.setWebhook(`${VERCEL_URL}/`);
+    res.json({ status: "success", message: "Webhook set to " + `${VERCEL_URL}/` });
+  } catch (e) {
+    res.json({ status: "error", message: e.message || e.toString() });
+  }
+});
 bot.launch()
