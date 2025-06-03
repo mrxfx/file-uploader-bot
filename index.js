@@ -27,12 +27,10 @@ bot.telegram.setWebhook(`${VERCEL_URL}/`)
 bot.start(async (ctx) => {
   const id = ctx.from.id
   const name = ctx.from.first_name
-  const userData = { telegramid: id, first_name: name, date: Date.now() }
-
   try {
     const existing = await axios.get(`${FIREBASE_DB_URL}/users/${id}.json`)
     if (!existing.data) {
-      await axios.put(`${FIREBASE_DB_URL}/users/${id}.json`, userData)
+      await axios.put(`${FIREBASE_DB_URL}/users/${id}.json`, { telegramid: id, first_name: name, date: Date.now() })
       const res = await axios.get(`${FIREBASE_DB_URL}/users.json`)
       const totalUsers = Object.keys(res.data || {}).length
       const message = `➕ <b>New User Notification</b> ➕\n\n👤<b>User:</b> <a href="tg://user?id=${id}">${name}</a>\n\n🆔<b>User ID:</b> <code>${id}</code>\n\n🌝 <b>Total Users Count: ${totalUsers}</b>`
@@ -40,32 +38,22 @@ bot.start(async (ctx) => {
     }
   } catch {}
 
-  await ctx.replyWithHTML(
-    `👋<b>Welcome <a href="tg://user?id=${id}">${name}</a>,\n\nI am here to host your file for free. Share me file which should be less than 30 mb</b>`,
-    { reply_to_message_id: ctx.message.message_id }
-  )
+  await ctx.replyWithHTML(`👋<b>Welcome <a href="tg://user?id=${id}">${name}</a>,\n\nI am here to host your file for free. Share me file which should be less than 30 mb</b>`, { reply_to_message_id: ctx.message.message_id })
 })
 
 bot.command("webhook", async (ctx) => {
   try {
     await bot.telegram.setWebhook(`${VERCEL_URL}/`)
-    ctx.reply(JSON.stringify({ status: "Webhook set successfully" }), {
-      reply_to_message_id: ctx.message.message_id
-    })
+    ctx.reply(JSON.stringify({ status: "Webhook set successfully" }), { reply_to_message_id: ctx.message.message_id })
   } catch (e) {
-    ctx.reply(JSON.stringify({ error: e.message }), {
-      reply_to_message_id: ctx.message.message_id
-    })
+    ctx.reply(JSON.stringify({ error: e.message }), { reply_to_message_id: ctx.message.message_id })
   }
 })
 
 bot.command("broadcast", async (ctx) => {
   if (ctx.from.id.toString() !== ADMIN_ID) return
   ctx.session.broadcast = true
-  await ctx.reply("<b>Enter Broadcast Message Here 👇</b>", {
-    parse_mode: "HTML",
-    reply_to_message_id: ctx.message.message_id
-  })
+  await ctx.reply("<b>Enter Broadcast Message Here 👇</b>", { parse_mode: "HTML", reply_to_message_id: ctx.message.message_id })
 })
 
 bot.on("message", async (ctx, next) => {
@@ -120,9 +108,7 @@ bot.on(["document", "video", "photo", "sticker", "animation"], async (ctx) => {
   }
 
   if (file_size > MAX_SIZE) {
-    await ctx.reply("❌ File too large. Only files under 30 MB are allowed.", {
-      reply_to_message_id: ctx.message.message_id
-    })
+    await ctx.reply("❌ File too large. Only files under 30 MB are allowed.", { reply_to_message_id: ctx.message.message_id })
     return
   }
 
@@ -145,14 +131,12 @@ bot.on(["document", "video", "photo", "sticker", "animation"], async (ctx) => {
   await ctx.reply(link, { reply_to_message_id: ctx.message.message_id })
 })
 
-app.get("/webhook", (req, res) => {
-  res.json({ status: "Webhook is live ✅" })
-})
-
 app.get("/upload", (req, res) => {
-  const file = storage[req.query.id]
-  if (!file) return res.status(404).send("File not found")
+  const id = req.query.id
+  if (!id || !storage[id]) return res.status(404).send("File not found")
+  const file = storage[id]
   res.setHeader("Content-Disposition", `attachment; filename="${file.name}"`)
+  res.setHeader("Content-Type", "application/octet-stream")
   res.send(file.buffer)
 })
 
