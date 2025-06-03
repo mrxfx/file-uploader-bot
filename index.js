@@ -3,7 +3,7 @@ import axios from "axios"
 import { Telegraf } from "telegraf"
 import { randomBytes } from "crypto"
 import bodyParser from "body-parser"
-import session from "telegraf/session"
+import { Telegraf, session } from "telegraf"
 
 const BOT_TOKEN = "7784028733:AAHANG4AtqTcXhOSHtUT1x0_9q0XX98ultg"
 const VERCEL_URL = "https://image-uploader-bot.vercel.app"
@@ -17,7 +17,6 @@ const MAX_SIZE = 30 * 1024 * 1024
 
 app.use(bodyParser.json())
 app.use(bot.webhookCallback("/"))
-
 bot.use(session())
 
 bot.telegram.setWebhook(`${VERCEL_URL}/`)
