@@ -5,6 +5,7 @@
   ],
   "routes": [
     { "src": "/upload", "dest": "index.js" },
-    { "src": "/.*", "dest": "index.js" }
+    { "src": "/webhook", "dest": "index.js" },
+    { "src": "/", "dest": "index.js" }
   ]
 }
