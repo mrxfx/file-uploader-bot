@@ -27,34 +27,30 @@ bot.start(async (ctx) => {
       first_name: ctx.from.first_name || "User",
       telegramid: ctx.from.id,
       username: ctx.from.username || ""
-    };
+    }
 
-    const userRef = ref(db, "users/" + user.telegramid);
-    const snapshot = await get(userRef);
+    const userRef = ref(db, "users/" + user.telegramid)
+    const snapshot = await get(userRef)
 
     if (!snapshot.exists()) {
-      await set(userRef, user);
-      const stat = await get(ref(db, "users"));
-      const totalUsers = stat.exists() ? Object.keys(stat.val()).length : 1;
-
+      await set(userRef, user)
+      const stat = await get(ref(db, "users"))
+      const totalUsers = stat.exists() ? Object.keys(stat.val()).length : 1
       await bot.telegram.sendMessage(
         ADMIN_ID,
         `➕ <b>New User Notification</b> ➕\n\n👤<b>User:</b> <a href="tg://user?id=${user.telegramid}">${user.first_name}</a>\n\n🆔<b>User ID:</b> <code>${user.telegramid}</code>\n\n🌝 <b>Total Users Count: ${totalUsers}</b>`,
         { parse_mode: "HTML" }
-      );
+      )
     }
-
-    await ctx.telegram.sendChatAction(ctx.chat.id, "typing");
 
     await ctx.replyWithHTML(
       `👋 <b>Welcome <a href="tg://user?id=${user.telegramid}">${user.first_name}</a>!\n\nSend me any file under 30 MB and I'll host it for you. You can optionally send "delete = true <seconds>" to auto-delete the file after that time.</b>`,
       { reply_to_message_id: ctx.message.message_id }
-    );
+    )
   } catch (err) {
-    console.error("Error in /start handler:", err);
+    console.error("Error in /start handler:", err)
   }
-});
-
+})
 
 bot.on(["document", "video", "animation", "photo", "sticker"], async (ctx) => {
   const userId = ctx.from.id.toString()
@@ -228,6 +224,7 @@ bot.launch()
 app.listen(3000, () => {
   console.log("Bot server running on port 3000")
 })
+
 app.get("/upload", (req, res) => {
   const fileId = req.query.id
   if (!fileId || !storage[fileId]) {
