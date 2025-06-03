@@ -3,7 +3,7 @@ import axios from "axios"
 import { Telegraf } from "telegraf"
 import { randomBytes } from "crypto"
 
-const BOT_TOKEN = "7784028733:AAGcafv9whKIYgcn6yqp7ebylVCfGV3pL6g"
+const BOT_TOKEN = "7784028733:AAHANG4AtqTcXhOSHtUT1x0_9q0XX98ultg"
 const VERCEL_URL = "https://image-uploader-bot.vercel.app"
 const FIREBASE_DB_URL = "https://flecdev-efed1-default-rtdb.firebaseio.com"
 const ADMIN_ID = "6918300873"
