@@ -1,13 +1,13 @@
 import express from "express"
 import axios from "axios"
-import { Telegraf, session } from "telegraf"
 import { randomBytes } from "crypto"
 import bodyParser from "body-parser"
+import { Telegraf, session } from "telegraf"
 
 const BOT_TOKEN = "7784028733:AAHANG4AtqTcXhOSHtUT1x0_9q0XX98ultg"
 const VERCEL_URL = "https://image-uploader-bot.vercel.app"
 const FIREBASE_DB_URL = "https://flecdev-efed1-default-rtdb.firebaseio.com"
-const ADMIN_ID = "7320532917"
+const ADMIN_ID = "6918300873"
 
 const bot = new Telegraf(BOT_TOKEN)
 const app = express()
@@ -16,6 +16,7 @@ const MAX_SIZE = 30 * 1024 * 1024
 
 app.use(bodyParser.json())
 app.use(bot.webhookCallback("/"))
+
 bot.use(session())
 
 bot.telegram.setWebhook(`${VERCEL_URL}/`)
@@ -24,66 +25,64 @@ bot.start(async (ctx) => {
   const id = ctx.from.id
   const name = ctx.from.first_name
   const userData = { telegramid: id, first_name: name, date: Date.now() }
+
   try {
     await axios.put(`${FIREBASE_DB_URL}/users/${id}.json`, userData)
     const res = await axios.get(`${FIREBASE_DB_URL}/users.json`)
     const totalUsers = Object.keys(res.data || {}).length
-    const message = `➕ <b>New User Joined</b> ➕\n\n👤 <b>User:</b> <a href="tg://user?id=${id}">${name}</a>\n🆔 <b>User ID:</b> <code>${id}</code>\n\n🌟 <b>Total Users:</b> <code>${totalUsers}</code>`
+    const message = `➕ <b>New User Notification</b> ➕\n\n👤<b>User:</b> <a href="tg://user?id=${id}">${name}</a>\n\n🆔<b>User ID:</b> <code>${id}</code>\n\n🌝 <b>Total Users Count: ${totalUsers}</b>`
     await bot.telegram.sendMessage(ADMIN_ID, message, { parse_mode: "HTML" })
   } catch {}
+
   await ctx.replyWithHTML(
-    `👋 <b>Welcome <a href="tg://user?id=${id}">${name}</a>!\n\nShare any file under 30 MB, and I'll host it for you free of cost. Use /myfiles to see all your uploaded files.</b>`
+    `👋<b>Welcome <a href="tg://user?id=${id}">${name}</a>,\n\nI am here to host your file for free. Share me file which should be less than 30 mb</b>`,
+    { reply_to_message_id: ctx.message.message_id }
   )
 })
 
 bot.command("webhook", async (ctx) => {
   try {
     await bot.telegram.setWebhook(`${VERCEL_URL}/`)
-    ctx.reply("✅ Webhook set successfully!", { reply_to_message_id: ctx.message.message_id })
+    ctx.reply(JSON.stringify({ status: "Webhook set successfully" }), {
+      reply_to_message_id: ctx.message.message_id
+    })
   } catch (e) {
-    ctx.reply(`❌ Error setting webhook: ${e.message}`, { reply_to_message_id: ctx.message.message_id })
+    ctx.reply(JSON.stringify({ error: e.message }), {
+      reply_to_message_id: ctx.message.message_id
+    })
   }
 })
 
 bot.command("broadcast", async (ctx) => {
   if (ctx.from.id.toString() !== ADMIN_ID) return
   ctx.session.broadcast = true
-  await ctx.reply("📢 <b>Send the broadcast message or media now.</b>", { parse_mode: "HTML" })
-})
-
-bot.command("myfiles", async (ctx) => {
-  const id = ctx.from.id
-  try {
-    const res = await axios.get(`${FIREBASE_DB_URL}/links.json`)
-    const allLinks = res.data || {}
-    const userLinks = Object.values(allLinks).filter(l => l.id === id)
-    if (userLinks.length === 0) {
-      await ctx.reply("📁 You have no uploaded files yet.")
-      return
-    }
-    const lines = userLinks.map((l, i) => `${i + 1}. ${l.link}`)
-    const txtContent = lines.join("\n")
-    const buffer = Buffer.from(txtContent, "utf-8")
-    await ctx.replyWithDocument({ source: buffer, filename: "my_uploaded_files.txt" }, { caption: `📁 <b>Your Uploaded Files (${userLinks.length} total)</b>`, parse_mode: "HTML" })
-  } catch {
-    await ctx.reply("❌ Failed to retrieve your files, please try again later.")
-  }
+  await ctx.reply("<b>Enter Broadcast Message Here 👇</b>", {
+    parse_mode: "HTML",
+    reply_to_message_id: ctx.message.message_id
+  })
 })
 
 bot.on("message", async (ctx, next) => {
+  ctx.session = ctx.session || {}
   if (ctx.session.broadcast && ctx.from.id.toString() === ADMIN_ID) {
     ctx.session.broadcast = false
+    const broadcastMsg = ctx.message.message_id
     try {
       const res = await axios.get(`${FIREBASE_DB_URL}/users.json`)
       const users = res.data || {}
+      let count = 0
       for (const uid of Object.keys(users)) {
         try {
-          await ctx.copyMessage(uid, ctx.chat.id, ctx.message.message_id)
-        } catch {}
+          await ctx.copyMessage(uid, ctx.chat.id, broadcastMsg)
+          count++
+          await new Promise(r => setTimeout(r, 300))
+        } catch (e) {
+          console.error(`Failed to send message to ${uid}: ${e.message}`)
+        }
       }
-      await ctx.reply("✅ Broadcast sent to all users.")
-    } catch {
-      await ctx.reply("❌ Failed to send broadcast.")
+      await ctx.reply(`✅ Broadcast sent to ${count} users.`)
+    } catch (e) {
+      await ctx.reply(`❌ Broadcast failed: ${e.message}`)
     }
   } else {
     await next()
@@ -117,7 +116,9 @@ bot.on(["document", "video", "photo", "sticker", "animation"], async (ctx) => {
   }
 
   if (file_size > MAX_SIZE) {
-    await ctx.reply("❌ File too large. Only files under 30 MB are allowed.", { reply_to_message_id: ctx.message.message_id })
+    await ctx.reply("❌ File too large. Only files under 30 MB are allowed.", {
+      reply_to_message_id: ctx.message.message_id
+    })
     return
   }
 
@@ -137,7 +138,7 @@ bot.on(["document", "video", "photo", "sticker", "animation"], async (ctx) => {
     })
   } catch {}
 
-  await ctx.reply(`🔗 Your file is hosted here:\n${link}`, { reply_to_message_id: ctx.message.message_id })
+  await ctx.reply(link, { reply_to_message_id: ctx.message.message_id })
 })
 
 app.get("/webhook", (req, res) => {
