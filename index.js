@@ -13,15 +13,18 @@ const app = express()
 const storage = {}
 const MAX_SIZE = 30 * 1024 * 1024
 
-bot.command("/", async (ctx) => {
-  await bot.telegram.setWebhook(`${VERCEL_URL}`)
-  await ctx.reply("✅ Webhook set successfully.")
+app.get("/webhook", async (req, res) => {
+  try {
+    await bot.telegram.setWebhook(`${VERCEL_URL}`)
+    res.json({ status: "Webhook set successfully" })
+  } catch {
+    res.json({ error: "Failed to set webhook" })
+  }
 })
 
 bot.start(async (ctx) => {
   const id = ctx.from.id
   const name = ctx.from.first_name
-
   await ctx.telegram.sendChatAction(id, "typing")
 
   const userData = {
@@ -32,12 +35,9 @@ bot.start(async (ctx) => {
 
   try {
     await axios.put(`${FIREBASE_DB_URL}/users/${id}.json`, userData)
-
     const res = await axios.get(`${FIREBASE_DB_URL}/users.json`)
     const totalUsers = Object.keys(res.data || {}).length
-
     const message = `➕ <b>New User Notification</b> ➕\n\n👤<b>User:</b> <a href="tg://user?id=${id}">${name}</a>\n\n🆔<b>User ID:</b> <code>${id}</code>\n\n🌝 <b>Total Users Count: ${totalUsers}</b>`
-
     await bot.telegram.sendMessage(ADMIN_ID, message, { parse_mode: "HTML" })
   } catch {}
 
@@ -59,7 +59,6 @@ bot.on("message", async (ctx, next) => {
   if (ctx.session.broadcast && ctx.from.id.toString() === ADMIN_ID) {
     ctx.session.broadcast = false
     const broadcastMsg = ctx.message.message_id
-
     try {
       const res = await axios.get(`${FIREBASE_DB_URL}/users.json`)
       const users = res.data || {}
