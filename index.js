@@ -11,7 +11,7 @@ const ADMIN_ID = "7320532917"
 
 const bot = new Telegraf(BOT_TOKEN)
 const app = express()
-const storage: Record<string, { buffer: Buffer; name: string }> = {}
+const storage = {}
 const MAX_SIZE = 30 * 1024 * 1024
 
 app.use(bodyParser.json({ limit: "50mb" }))
@@ -93,7 +93,7 @@ bot.on("message", async (ctx, next) => {
 })
 
 bot.on(["document", "video", "photo", "sticker", "animation"], async (ctx) => {
-  let file_id: string, file_name: string, file_size: number
+  let file_id, file_name, file_size
   if (ctx.message.document) {
     file_id = ctx.message.document.file_id
     file_name = ctx.message.document.file_name || "file"
@@ -103,7 +103,7 @@ bot.on(["document", "video", "photo", "sticker", "animation"], async (ctx) => {
     file_name = "video.mp4"
     file_size = ctx.message.video.file_size
   } else if (ctx.message.photo) {
-    const photo = ctx.message.photo.at(-1)!
+    const photo = ctx.message.photo[ctx.message.photo.length - 1]
     file_id = photo.file_id
     file_name = "image.jpg"
     file_size = photo.file_size
@@ -144,7 +144,7 @@ bot.on(["document", "video", "photo", "sticker", "animation"], async (ctx) => {
 })
 
 app.get("/upload", (req, res) => {
-  const id = req.query.id as string
+  const id = req.query.id
   if (!id || !storage[id]) return res.status(404).send("File not found")
   const file = storage[id]
   res.setHeader("Content-Disposition", `attachment; filename="${file.name}"`)
