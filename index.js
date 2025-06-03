@@ -5,7 +5,7 @@ import { randomBytes } from "crypto"
 import { initializeApp } from "firebase/app"
 import { getDatabase, ref, set, push, get, remove } from "firebase/database"
 
-const BOT_TOKEN = "7784028733:AAFILq2JCqa1JlgWTpLbs3aHxa13DheuLeY"
+const BOT_TOKEN = "7784028733:AAGcafv9whKIYgcn6yqp7ebylVCfGV3pL6g"
 const ADMIN_ID = "6918300873"
 const FIREBASE_DB_URL = "https://flecdev-efed1-default-rtdb.firebaseio.com"
 const MAX_SIZE = 30 * 1024 * 1024
