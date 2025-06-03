@@ -259,7 +259,7 @@ app.listen(process.env.PORT || 3000, () => {
 })
 app.get("/webhook", async (req, res) => {
   try {
-    await bot.telegram.setWebhook(`${VERCEL_URL}/`);
+    await bot.telegram.setWebhook(`${VERCEL_URL}`);
     res.json({ status: "success", message: "Webhook set to " + `${VERCEL_URL}/` });
   } catch (e) {
     res.json({ status: "error", message: e.message || e.toString() });
