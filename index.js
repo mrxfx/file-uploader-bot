@@ -13,19 +13,17 @@ const MAX_FILES_PER_USER = 50
 
 const bot = new Telegraf(BOT_TOKEN)
 const app = express()
-const storage = {}
-
 app.use(bodyParser.json())
-app.use(bot.webhookCallback("/"))
 bot.use(session())
 
 bot.telegram.setWebhook(`${VERCEL_URL}/`)
+app.use(bot.webhookCallback("/"))
 
-async function getUserLinks(userId) {
+async function getUserFiles(userId) {
   try {
     const res = await axios.get(`${FIREBASE_DB_URL}/links.json`)
     const allLinks = res.data || {}
-    return Object.values(allLinks).filter(l => l.id === userId)
+    return Object.entries(allLinks).filter(([key, val]) => val.id === userId).map(([key, val]) => ({ key, ...val }))
   } catch {
     return []
   }
@@ -40,152 +38,99 @@ async function getTotalUsers() {
   }
 }
 
+async function deleteFile(key) {
+  try {
+    await axios.delete(`${FIREBASE_DB_URL}/links/${key}.json`)
+    return true
+  } catch {
+    return false
+  }
+}
+
+function formatFileList(files) {
+  if (!files.length) return "📁 You have no uploaded files."
+  return files.map((f, i) => `${i + 1}. <a href="${f.link}">${f.link}</a>`)
+    .join("\n")
+}
+
+function buildDeleteButtons(files) {
+  return files.map(f => [Markup.button.callback(`🗑️ Delete #${f.key.slice(0,6)}`, `delete_${f.key}`)])
+}
+
 bot.start(async (ctx) => {
   const id = ctx.from.id
   const name = ctx.from.first_name
-  const userData = { telegramid: id, first_name: name, date: Date.now() }
-
-  try {
-    await axios.put(`${FIREBASE_DB_URL}/users/${id}.json`, userData)
-  } catch {}
-
-  const totalUsers = await getTotalUsers()
-  const userLinks = await getUserLinks(id)
-  const welcomeMsg = userLinks.length > 0
-    ? `👋 Welcome back, <b>${name}</b>!\n\nYou have already uploaded <b>${userLinks.length}</b> files.\n\nUse /myfiles to get all your file links or /deletefiles to delete them.`
-    : `👋 Welcome, <b>${name}</b>!\n\nSend me any file (up to 30MB), and I'll host it for free.\n\nYou can manage your files with /myfiles and /deletefiles.`
-
-  await ctx.replyWithHTML(welcomeMsg, {
-    reply_to_message_id: ctx.message?.message_id,
-    reply_markup: Markup.inlineKeyboard([
-      [Markup.button.callback("📁 My Files", "MY_FILES"), Markup.button.callback("🗑️ Delete Files", "DELETE_FILES")]
-    ])
-  })
-})
-
-bot.command("help", async (ctx) => {
-  const helpText = `
-🤖 <b>Image Uploader Bot Help</b>
-
-📤 Send any file under 30MB to upload and get a permanent URL.
-📁 /myfiles - Get all your uploaded file URLs in a TXT file.
-🗑️ /deletefiles - Delete all your uploaded file records.
-📊 /stats - View your stats and total users.
-📢 /broadcast - Admin only: Send broadcast message to all users.
-🏓 /ping - Check if bot is alive.
-
-Use the buttons below for quick actions.
-`
-  await ctx.replyWithHTML(helpText, {
-    reply_to_message_id: ctx.message?.message_id,
-    reply_markup: Markup.inlineKeyboard([
-      [Markup.button.callback("📁 My Files", "MY_FILES"), Markup.button.callback("🗑️ Delete Files", "DELETE_FILES")]
-    ])
-  })
-})
-
-bot.command("stats", async (ctx) => {
-  const id = ctx.from.id
-  const userLinks = await getUserLinks(id)
+  await axios.put(`${FIREBASE_DB_URL}/users/${id}.json`, { telegramid: id, first_name: name, date: Date.now() }).catch(() => {})
+  const files = await getUserFiles(id)
   const totalUsers = await getTotalUsers()
   await ctx.replyWithHTML(
-    `📊 <b>Your Stats</b>\n\n👤 User: <a href="tg://user?id=${id}">${ctx.from.first_name}</a>\n🗂️ Total Uploaded Files: <b>${userLinks.length}</b>\n🌍 Total Bot Users: <b>${totalUsers}</b>`, {
-      reply_to_message_id: ctx.message?.message_id
-    }
+    `👋 Hello <b>${name}</b>!\nYou have uploaded <b>${files.length}</b> files.\nTotal bot users: <b>${totalUsers}</b>\nSend me files (max 30MB) to upload.`,
+    { reply_to_message_id: ctx.message?.message_id }
   )
+})
+
+bot.command("ping", async (ctx) => {
+  const start = Date.now()
+  await ctx.reply("🏓 Ping...")
+  const diff = Date.now() - start
+  await ctx.reply(`🏓 Pong! Response time: <b>${diff} ms</b>`, { parse_mode: "HTML", reply_to_message_id: ctx.message?.message_id })
 })
 
 bot.command("myfiles", async (ctx) => {
   const id = ctx.from.id
-  const userLinks = await getUserLinks(id)
-
-  if (userLinks.length === 0) {
-    await ctx.reply("📁 You have no uploaded files yet.", { reply_to_message_id: ctx.message?.message_id })
+  const files = await getUserFiles(id)
+  if (!files.length) {
+    await ctx.reply("📁 You have no uploaded files.", { reply_to_message_id: ctx.message?.message_id })
     return
   }
-
-  const lines = userLinks.map((l, i) => `${i + 1}. ${l.link}`)
-  const txtContent = lines.join("\n")
-  const buffer = Buffer.from(txtContent, "utf-8")
-
-  await ctx.replyWithDocument({ source: buffer, filename: "my_uploaded_files.txt" }, {
-    caption: `📁 <b>Your Uploaded Files (${userLinks.length} total)</b>`,
-    parse_mode: "HTML",
-    reply_to_message_id: ctx.message?.message_id
-  })
+  await ctx.replyWithHTML(
+    `📁 Your uploaded files (${files.length}):\n\n` + formatFileList(files),
+    { disable_web_page_preview: true, reply_to_message_id: ctx.message?.message_id, reply_markup: Markup.inlineKeyboard(buildDeleteButtons(files)) }
+  )
 })
 
 bot.command("deletefiles", async (ctx) => {
   const id = ctx.from.id
-  try {
-    const res = await axios.get(`${FIREBASE_DB_URL}/links.json`)
-    const allLinks = res.data || {}
-
-    for (const key in allLinks) {
-      if (allLinks[key].id === id) {
-        await axios.delete(`${FIREBASE_DB_URL}/links/${key}.json`)
-      }
-    }
-    await ctx.reply("🗑️ All your uploaded file records have been deleted.", { reply_to_message_id: ctx.message?.message_id })
-  } catch {
-    await ctx.reply("❌ Failed to delete your files, please try again later.", { reply_to_message_id: ctx.message?.message_id })
+  const files = await getUserFiles(id)
+  if (!files.length) {
+    await ctx.reply("🗑️ You have no files to delete.", { reply_to_message_id: ctx.message?.message_id })
+    return
   }
+  for (const f of files) await deleteFile(f.key)
+  await ctx.reply("🗑️ All your uploaded file records deleted.", { reply_to_message_id: ctx.message?.message_id })
 })
 
-bot.action("MY_FILES", async (ctx) => {
-  await ctx.answerCbQuery()
-  ctx.message = ctx.update.callback_query.message
-  ctx.from = ctx.update.callback_query.from
-  await bot.handleUpdate({ message: ctx.message, from: ctx.from, update_id: ctx.update.update_id }, "myfiles")
-})
-
-bot.action("DELETE_FILES", async (ctx) => {
-  await ctx.answerCbQuery()
-  ctx.message = ctx.update.callback_query.message
-  ctx.from = ctx.update.callback_query.from
-  await bot.handleUpdate({ message: ctx.message, from: ctx.from, update_id: ctx.update.update_id }, "deletefiles")
-})
-
-bot.command("ping", async (ctx) => {
-  await ctx.reply("🏓 Pong!", { reply_to_message_id: ctx.message?.message_id })
-})
-
-bot.command("broadcast", async (ctx) => {
-  if (ctx.from.id.toString() !== ADMIN_ID) return
-  ctx.session.broadcast = true
-  await ctx.reply("📢 <b>Send the broadcast message or media now.</b>", { parse_mode: "HTML", reply_to_message_id: ctx.message?.message_id })
-})
-
-bot.on("message", async (ctx, next) => {
-  if (ctx.session.broadcast && ctx.from.id.toString() === ADMIN_ID) {
-    ctx.session.broadcast = false
-    try {
-      const res = await axios.get(`${FIREBASE_DB_URL}/users.json`)
-      const users = res.data || {}
-      for (const uid of Object.keys(users)) {
-        try {
-          await ctx.copyMessage(uid, ctx.chat.id, ctx.message.message_id)
-        } catch {}
-      }
-      await ctx.reply("✅ Broadcast sent to all users.", { reply_to_message_id: ctx.message?.message_id })
-    } catch {
-      await ctx.reply("❌ Failed to send broadcast.", { reply_to_message_id: ctx.message?.message_id })
-    }
-  } else {
-    await next()
+bot.action(/delete_(.+)/, async (ctx) => {
+  const key = ctx.match[1]
+  const id = ctx.from.id
+  const files = await getUserFiles(id)
+  if (!files.find(f => f.key === key)) {
+    await ctx.answerCbQuery("❌ This file doesn't belong to you or already deleted.", { show_alert: true })
+    return
   }
+  const ok = await deleteFile(key)
+  if (!ok) {
+    await ctx.answerCbQuery("❌ Failed to delete file.", { show_alert: true })
+    return
+  }
+  const newFiles = await getUserFiles(id)
+  const text = newFiles.length
+    ? `🗑️ File deleted. You have ${newFiles.length} files remaining:\n\n` + formatFileList(newFiles)
+    : "🗑️ File deleted. You have no uploaded files now."
+  const buttons = newFiles.length ? Markup.inlineKeyboard(buildDeleteButtons(newFiles)) : undefined
+  await ctx.editMessageText(text, { parse_mode: "HTML", disable_web_page_preview: true, reply_markup: buttons })
+  await ctx.answerCbQuery("✅ File deleted.")
 })
 
 bot.on(["document", "video", "photo", "sticker", "animation"], async (ctx) => {
   const id = ctx.from.id
-  const userLinks = await getUserLinks(id)
-  if (userLinks.length >= MAX_FILES_PER_USER) {
-    await ctx.reply(`❌ You have reached the maximum upload limit of ${MAX_FILES_PER_USER} files.`, { reply_to_message_id: ctx.message?.message_id })
+  const userFiles = await getUserFiles(id)
+  if (userFiles.length >= MAX_FILES_PER_USER) {
+    await ctx.reply(`❌ Upload limit reached: max ${MAX_FILES_PER_USER} files. Delete some files first.`, { reply_to_message_id: ctx.message?.message_id })
     return
   }
 
   let file_id, file_name, file_size
-
   if (ctx.message.document) {
     file_id = ctx.message.document.file_id
     file_name = ctx.message.document.file_name
@@ -210,16 +155,18 @@ bot.on(["document", "video", "photo", "sticker", "animation"], async (ctx) => {
   }
 
   if (file_size > MAX_SIZE) {
-    await ctx.reply("❌ File too large. Only files under 30 MB are allowed.", { reply_to_message_id: ctx.message?.message_id })
+    await ctx.reply("❌ File too large. Max size is 30MB.", { reply_to_message_id: ctx.message?.message_id })
     return
   }
 
   const file = await ctx.telegram.getFile(file_id)
   const url = `https://api.telegram.org/file/bot${BOT_TOKEN}/${file.file_path}`
-  const buffer = (await axios.get(url, { responseType: 'arraybuffer' })).data
+  const buffer = (await axios.get(url, { responseType: "arraybuffer" })).data
   const storageId = randomBytes(8).toString("hex")
-  storage[storageId] = { buffer, name: file_name }
   const link = `${VERCEL_URL}/upload?id=${storageId}`
+
+  if (!bot.context.storage) bot.context.storage = {}
+  bot.context.storage[storageId] = { buffer, name: file_name }
 
   try {
     await axios.post(`${FIREBASE_DB_URL}/links.json`, {
@@ -230,18 +177,16 @@ bot.on(["document", "video", "photo", "sticker", "animation"], async (ctx) => {
     })
   } catch {}
 
-  await ctx.reply(`🔗 Your file is hosted here:\n\n${link}`, {
+  await ctx.reply(`🔗 File uploaded:\n${link}`, {
     reply_to_message_id: ctx.message?.message_id,
-    reply_markup: Markup.inlineKeyboard([
-      [Markup.button.url("🔗 Open Link", link)]
-    ])
+    reply_markup: Markup.inlineKeyboard([[Markup.button.url("🔗 Open Link", link)]])
   })
 })
 
-app.get("/upload", async (req, res) => {
+app.get("/upload", (req, res) => {
   const id = req.query.id
-  if (!id || !storage[id]) return res.status(404).send("File not found.")
-  const { buffer, name } = storage[id]
+  if (!id || !bot.context.storage || !bot.context.storage[id]) return res.status(404).send("File not found.")
+  const { buffer, name } = bot.context.storage[id]
   res.setHeader("Content-Disposition", `attachment; filename="${name}"`)
   res.setHeader("Content-Type", "application/octet-stream")
   res.send(buffer)
@@ -249,6 +194,4 @@ app.get("/upload", async (req, res) => {
 
 app.get("/", (req, res) => res.send("Bot is running."))
 
-app.listen(process.env.PORT || 3000, () => {
-  console.log("Server running.")
-})
+app.listen(process.env.PORT || 3000, () => console.log("Server running."))
