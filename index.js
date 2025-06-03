@@ -230,6 +230,4 @@ bot.on(["document", "video", "photo", "sticker", "animation"], async (ctx) => {
 
   const file = await ctx.telegram.getFile(file_id);
   const url = `https://api.telegram.org/file/bot${BOT_TOKEN}/${file.file_path}`;
-  const buffer = (await axios.get
-::contentReference[oaicite:20]{index=20}
- 
+  const buffer = (await axios.get(url, { responseType: "arraybuffer" })).data;
