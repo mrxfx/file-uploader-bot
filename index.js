@@ -144,12 +144,14 @@ bot.on(["document", "video", "photo", "sticker", "animation"], async (ctx) => {
 })
 
 app.get("/upload", (req, res) => {
-  const id = req.query.id
-  if (!id || !storage[id]) return res.status(404).send("File not found")
-  const file = storage[id]
-  res.setHeader("Content-Disposition", `attachment; filename="${file.name}"`)
-  res.setHeader("Content-Type", "application/octet-stream")
-  res.send(file.buffer)
-})
+  const id = req.query.id;
+  if (!id || !storage[id]) {
+    return res.status(404).send("File not found");
+  }
+  const file = storage[id];
+  res.setHeader("Content-Disposition", `attachment; filename="${file.name}"`);
+  res.setHeader("Content-Type", "application/octet-stream");
+  res.send(file.buffer);
+});
 
 export default app
