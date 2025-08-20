@@ -6,7 +6,7 @@ import { Telegraf, session } from "telegraf"
 
 const BOT_TOKEN = "7761252567:AAGhrTvGoymzU1mF7IREqZwTf4BZK-6WyAc"
 const VERCEL_URL = "https://file-uploader-bot-eight.vercel.app"
-const FIREBASE_DB_URL = "DATABASE_URL"
+const FIREBASE_DB_URL = "https://pika-bomber-default-rtdb.firebaseio.com"
 const ADMIN_ID = "7700387826"
 
 const bot = new Telegraf(BOT_TOKEN)
